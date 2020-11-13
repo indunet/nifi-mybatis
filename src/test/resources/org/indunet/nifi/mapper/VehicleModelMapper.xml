@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="org.indunet.nifi.mapper.VehicleModelMapper">
+
+  <select id="listVehicleModel" resultType="org.indunet.nifi.entity.VehicleModelDO">
+        select
+            id,
+            manufacturer_id as manufacturerId,
+            name_cn as nameCn,
+            name_en as nameEn
+        from
+            vehicle_model
+  </select>
+</mapper>
