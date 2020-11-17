@@ -1,5 +1,7 @@
 package org.indunet.nifi;
 
+import java.lang.reflect.InvocationTargetException;
+import org.apache.ibatis.binding.BindingException;
 import org.apache.ibatis.mapping.Environment;
 import org.apache.ibatis.session.Configuration;
 import org.apache.ibatis.session.SqlSession;
@@ -17,11 +19,11 @@ import org.apache.nifi.controller.ConfigurationContext;
 import org.apache.nifi.controller.ControllerServiceInitializationContext;
 import org.apache.nifi.dbcp.DBCPService;
 import org.apache.nifi.logging.ComponentLog;
+import org.apache.nifi.reporting.InitializationException;
 
 import javax.sql.DataSource;
 import java.lang.reflect.Field;
 import java.lang.reflect.Proxy;
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
@@ -39,12 +41,9 @@ public abstract class AbstractNiBatisService extends AbstractControllerService {
             .identifiesControllerService(DBCPService.class)
             .build();
 
-    private static final List<PropertyDescriptor> properties =
-            Collections.unmodifiableList(Arrays.asList(new PropertyDescriptor[] {DBCP_SERVICE}));
-
     @Override
     protected List<PropertyDescriptor> getSupportedPropertyDescriptors() {
-        return properties;
+        return Collections.unmodifiableList(Collections.singletonList(DBCP_SERVICE));
     }
 
     @Override
@@ -57,20 +56,20 @@ public abstract class AbstractNiBatisService extends AbstractControllerService {
         DBCPService dbcpService = context.getProperty(DBCP_SERVICE).asControllerService(DBCPService.class);
 
         TransactionFactory factory = new JdbcTransactionFactory();
-        DataSource dataSource = null;
-        Field field = null;
+        DataSource dataSource = new DbcpServiceAdapter(dbcpService);
+        // Field field = null;
 
-        try {
-            field = dbcpService.getClass().getDeclaredField("dataSource");
-            field.setAccessible(true);
-
-            dataSource = (DataSource) field.get(dbcpService);
-        } catch (NoSuchFieldException | IllegalAccessException e) {
-            e.printStackTrace();
-            this.log.error(e.getMessage());
-
-            dataSource = new DbcpServiceAdapter(dbcpService);
-        }
+//        try {
+//            field = dbcpService.getClass().getDeclaredField("dataSource");
+//            field.setAccessible(true);
+//
+//            dataSource = (DataSource) field.get(dbcpService);
+//        } catch (NoSuchFieldException | IllegalAccessException e) {
+//            this.log.info("Fail getting data source from dbcp service.");
+//            this.log.info(e.getMessage());
+//
+//            dataSource = new DbcpServiceAdapter(dbcpService);
+//        }
 
         Environment environment = new Environment("nifi-mybatis", factory, dataSource);
         configuration = new Configuration(environment);
@@ -79,32 +78,47 @@ public abstract class AbstractNiBatisService extends AbstractControllerService {
 
     protected void autowire(Object object) {
         SqlSessionFactory sqlSessionFactory = new SqlSessionFactoryBuilder().build(configuration);
-
         Field[] fields = object.getClass().getDeclaredFields();
+
+        // Check before autowire.
+        Arrays.stream(fields)
+                .forEach(field -> {
+                        try (SqlSession session = sqlSessionFactory.openSession()) {
+                            // Throw org.apache.ibatis.binding.BindingException when there is no class found.
+                            session.getMapper(field.getType());
+                        } catch (BindingException e) {
+                            e.printStackTrace();
+                            this.log.error(e.getMessage());
+                            this.log.error(field.getType().getName() + " is not known to the MapperRegistry.");
+                        }
+
+                });
+
         Arrays.stream(fields)
                 .filter(field -> field.isAnnotationPresent(Autowired.class))
                 .filter(field -> field.getType().isInterface())
+                .peek(field -> field.setAccessible(true))
                 .forEach(field -> {
-                    field.setAccessible(true);
                     Object mapperProxy = Proxy.newProxyInstance(
                             sqlSessionFactory.getClass().getClassLoader(),
                             new Class[]{field.getType()},
                             (proxy, method, args) -> {
-                                SqlSession session = sqlSessionFactory.openSession();
+                                try(SqlSession session = sqlSessionFactory.openSession()) {
+                                    // Throw org.apache.ibatis.binding.BindingException when there is no class found.
+                                    Object mapper = session.getMapper(field.getType());
+                                    Object value = method.invoke(mapper, args);
 
-                                Object mapper = session.getMapper(field.getType());
+                                    session.commit();
+                                    session.close();
 
-                                if (mapper == null) {
-                                    this.log.error("The mapper of " + mapper.getClass().getName() + " doesn't exists.");
-                                    return null;
+                                    return value;
+                                } catch (IllegalAccessException | IllegalArgumentException
+                                            | InvocationTargetException | BindingException e) {
+                                    this.log.error(e.getMessage());
+                                    e.printStackTrace();
+
+                                    throw new InitializationException(e);
                                 }
-
-                                Object value = method.invoke(session.getMapper(field.getType()), args);
-
-                                session.commit();
-                                session.close();
-
-                                return value;
                             }
                     );
 
