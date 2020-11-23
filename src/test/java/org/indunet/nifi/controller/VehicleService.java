@@ -8,6 +8,6 @@ import org.indunet.nifi.mapper.VehicleMapper;
 import java.util.List;
 
 public interface VehicleService extends ControllerService {
-    List<VehicleDO> listVehicle();
     List<VehicleModelDO> listVehicleModel();
+    List<VehicleDO> listVehicle();
 }
