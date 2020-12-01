@@ -30,7 +30,7 @@ import java.util.List;
 
 @Tags({"nifi", "mybatis", "database", "autowire"})
 @CapabilityDescription("Provides database access through mybatis, processors use it as controller services.")
-public abstract class AbstractNiBatisService extends AbstractControllerService {
+public abstract class AbstractMyBatisService extends AbstractControllerService {
     protected ComponentLog log;
     private Configuration configuration;
 

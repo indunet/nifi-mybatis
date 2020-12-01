@@ -1,7 +1,7 @@
 package org.indunet.nifi.controller;
 
 import org.apache.ibatis.session.Configuration;
-import org.indunet.nifi.AbstractNiBatisService;
+import org.indunet.nifi.AbstractMyBatisService;
 import org.indunet.nifi.Autowired;
 import org.indunet.nifi.entity.VehicleDO;
 import org.indunet.nifi.entity.VehicleModelDO;
@@ -10,7 +10,7 @@ import org.indunet.nifi.mapper.VehicleModelMapper;
 
 import java.util.List;
 
-public class VehicleControllerService extends AbstractNiBatisService implements VehicleService {
+public class VehicleControllerService extends AbstractMyBatisService implements VehicleService {
     @Autowired
     VehicleMapper vehicleMapper;
     @Autowired
