@@ -6,19 +6,28 @@ import org.apache.ibatis.session.Configuration;
 import org.apache.ibatis.transaction.TransactionFactory;
 import org.apache.ibatis.transaction.jdbc.JdbcTransactionFactory;
 import org.indunet.nifi.mapper.VehicleMapper;
+import org.indunet.nifi.service.VehicleService;
 import org.junit.Test;
 import org.mybatis.spring.SqlSessionFactoryBean;
 import org.mybatis.spring.SqlSessionTemplate;
+import org.mybatis.spring.mapper.MapperFactoryBean;
 import org.mybatis.spring.mapper.MapperScannerConfigurer;
+import org.springframework.aop.aspectj.autoproxy.AspectJAwareAdvisorAutoProxyCreator;
 import org.springframework.beans.factory.config.AutowireCapableBeanFactory;
 import org.springframework.beans.factory.config.BeanDefinition;
+import org.springframework.beans.factory.config.ConfigurableListableBeanFactory;
 import org.springframework.beans.factory.support.BeanDefinitionBuilder;
 import org.springframework.beans.factory.support.BeanDefinitionRegistry;
+import org.springframework.beans.factory.xml.XmlBeanDefinitionReader;
 import org.springframework.context.support.GenericApplicationContext;
 import org.springframework.jdbc.datasource.DataSourceTransactionManager;
+import org.springframework.transaction.config.JtaTransactionManagerFactoryBean;
+import org.springframework.transaction.jta.JtaTransactionManager;
 
 import javax.sql.DataSource;
 import java.util.Arrays;
+import java.util.stream.IntStream;
+import java.util.stream.Stream;
 
 public class NiFiApplicationContextTest {
     static protected NiFiApplicationContextTest niFiApplicationContext;
@@ -26,6 +35,7 @@ public class NiFiApplicationContextTest {
 
     public NiFiApplicationContextTest() {
         this.applicationContext = new GenericApplicationContext();
+        new XmlBeanDefinitionReader(applicationContext).loadBeanDefinitions("nifi-spring.xml");
     }
 
     synchronized public static NiFiApplicationContextTest get() {
@@ -79,49 +89,86 @@ public class NiFiApplicationContextTest {
 //        manager.print();
 //        System.out.println("Init spring context");
 
-        DruidDataSource dataSource = new DruidDataSource();
+//        DruidDataSource dataSource = new DruidDataSource();
+//
+//        dataSource.setDriverClassName("org.postgresql.Driver");
+//        dataSource.setUrl("jdbc:postgresql://dell-node-06:5432/chance-om");
+//        dataSource.setUsername("postgres");
+//        dataSource.setPassword("123456");
+//
+//        beanFactory.registerBeanDefinition("dataSource",
+//                BeanDefinitionBuilder.genericBeanDefinition(DataSource.class, () -> dataSource).getRawBeanDefinition());
 
-        dataSource.setDriverClassName("org.postgresql.Driver");
-        dataSource.setUrl("jdbc:postgresql://dell-node-06:5432/chance-om");
-        dataSource.setUsername("postgres");
-        dataSource.setPassword("123456");
+        // TransactionFactory factory = new JdbcTransactionFactory();
 
-        beanFactory.registerBeanDefinition("dataSource",
-                BeanDefinitionBuilder.genericBeanDefinition(DataSource.class, () -> dataSource).getRawBeanDefinition());
-
-        TransactionFactory factory = new JdbcTransactionFactory();
-
-        Environment environment = new Environment("nifi-mybatis", factory, dataSource);
-        Configuration configuration = new Configuration(environment);
-        configuration.addMappers("org.indunet.nifi.mapper");
+        // Environment environment = new Environment("nifi-mybatis", factory, dataSource);
+        // Configuration configuration = new Configuration(environment);
+        // configuration.addMappers("org.indunet.nifi.mapper");
+        Configuration configuration = new Configuration();
+        configuration.setMapUnderscoreToCamelCase(true);
 
         // beanFactory.registerBeanDefinition("configuration", BeanDefinitionBuilder.genericBeanDefinition(Configuration.class, () -> configuration).getRawBeanDefinition());
-
         // SqlSessionFactoryBean factoryBean = new SqlSessionFactoryBean();
 
-        BeanDefinitionBuilder bd = BeanDefinitionBuilder.genericBeanDefinition(SqlSessionFactoryBean.class);
-        bd.addPropertyValue("dataSource", dataSource);
-        bd.addPropertyValue("configuration", configuration);
+        BeanDefinitionBuilder sqlSessionFactory = BeanDefinitionBuilder.genericBeanDefinition(SqlSessionFactoryBean.class);
+        sqlSessionFactory.addPropertyReference("dataSource", "dataSource");
+        sqlSessionFactory.addPropertyValue("configuration", configuration);
+        sqlSessionFactory.addPropertyValue("mapperLocations", "classpath*:org/indunet/nifi/mapper/*.xml");
 
-//        factoryBean.setDataSource(dataSource);
-//        factoryBean.setConfiguration(configuration);
-        beanFactory.registerBeanDefinition("sqlSessionFactory", bd.getBeanDefinition());
+         beanFactory.registerBeanDefinition("sqlSessionFactory", sqlSessionFactory.getBeanDefinition());
         // factoryBean.set
 
         // DataSourceTransactionManager
 
-        MapperScannerConfigurer scanner = new MapperScannerConfigurer();
-        scanner.setBasePackage("org.indunet.mapper");
-        scanner.setSqlSessionFactoryBeanName("sqlSessionFactory");
-        beanFactory.registerBeanDefinition("scanner",
-                BeanDefinitionBuilder.genericBeanDefinition(MapperScannerConfigurer.class, () -> scanner).getRawBeanDefinition());
+        // Transaction
+        BeanDefinitionBuilder transactionManager = BeanDefinitionBuilder.genericBeanDefinition(DataSourceTransactionManager.class);
+        transactionManager.addConstructorArgReference("dataSource");
+        beanFactory.registerBeanDefinition("transactionManager", transactionManager.getBeanDefinition());
+
+//        BeanDefinitionBuilder jtaTransactionManager = BeanDefinitionBuilder.genericBeanDefinition(JtaTransactionManagerFactoryBean.class);
+//        beanFactory.registerBeanDefinition("jtaTransactionManager", jtaTransactionManager.getBeanDefinition());
+
+//        MapperScannerConfigurer scanner = new MapperScannerConfigurer();
+//        scanner.setBasePackage("org.indunet.mapper");
+//        scanner.setSqlSessionFactoryBeanName("sqlSessionFactory");
+//        beanFactory.registerBeanDefinition("scanner",
+//                BeanDefinitionBuilder.genericBeanDefinition(MapperScannerConfigurer.class, () -> scanner).getRawBeanDefinition());
 //        SqlSessionTemplate template = new SqlSessionTemplate(factoryBean.getObject());
 //        beanFactory.registerBeanDefinition("sqlSessionTemplate", BeanDefinitionBuilder.genericBeanDefinition(SqlSessionTemplate.class, () -> template).getRawBeanDefinition());
 
+//        BeanDefinitionBuilder vehicleMapper = BeanDefinitionBuilder.genericBeanDefinition(MapperFactoryBean.class);
+//        vehicleMapper.addPropertyValue("mapperInterface", "org.indunet.nifi.mapper.VehicleMapper");
+//        vehicleMapper.addPropertyReference("sqlSessionFactory", "sqlSessionFactory");
+//        beanFactory.registerBeanDefinition("vehicleMapper", vehicleMapper.getBeanDefinition());
+//
+//        BeanDefinitionBuilder vehicleModelMapper = BeanDefinitionBuilder.genericBeanDefinition(MapperFactoryBean.class);
+//        vehicleModelMapper.addPropertyValue("mapperInterface", "org.indunet.nifi.mapper.VehicleModelMapper");
+//        vehicleModelMapper.addPropertyReference("sqlSessionFactory", "sqlSessionFactory");
+//        beanFactory.registerBeanDefinition("vehicleModelMapper", vehicleModelMapper.getBeanDefinition());
+
+         beanFactory.registerBeanDefinition("vehicleService", BeanDefinitionBuilder.genericBeanDefinition(VehicleService.class).getRawBeanDefinition());
+
         context.applicationContext.refresh();
+
+//        ConfigurableListableBeanFactory factory = context.applicationContext.getBeanFactory();
+//        AspectJAwareAdvisorAutoProxyCreator aspectJPostProcessor = new AspectJAwareAdvisorAutoProxyCreator();
+//        aspectJPostProcessor.setBeanFactory(factory);
+//        aspectJPostProcessor.setProxyClassLoader(context.applicationContext.getClassLoader());
+//        factory.addBeanPostProcessor(aspectJPostProcessor);
 
         // VehicleMapper vehicleMapper = context.applicationContext.getBean(VehicleMapper.class);
         System.out.println(context.applicationContext.getBeanDefinitionNames().length);
         Arrays.stream(context.applicationContext.getBeanDefinitionNames()).forEach(System.out::println);
+
+        System.out.println(context.applicationContext.getBean(VehicleMapper.class).listVehicle().size());
+        System.out.println(context.applicationContext.getBean(VehicleService.class).count());
+
+        VehicleService vehicleService = context.applicationContext.getBean(VehicleService.class);
+
+        IntStream.range(0, 10)
+                .parallel().forEach(i -> {
+            vehicleService.saveVehicle();
+            // vehicleService.saveVehicleModel();
+        });
     }
 }

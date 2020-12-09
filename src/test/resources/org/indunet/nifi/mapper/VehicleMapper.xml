@@ -10,4 +10,9 @@
         from
             vehicle
   </select>
+
+    <insert id = "save">
+        insert into test_table(name, value)
+            values('vehicle', 1);
+    </insert>
 </mapper>

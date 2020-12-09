@@ -6,4 +6,5 @@ import java.util.List;
 
 public interface VehicleMapper {
     List<VehicleDO> listVehicle();
+    int save();
 }
