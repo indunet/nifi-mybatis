@@ -10,7 +10,7 @@ import org.springframework.transaction.annotation.Transactional;
  * @author
  * @version 1.0
  */
-// @Service
+@Service
 public class VehicleService {
     @Autowired
     VehicleModelMapper vehicleModelMapper;
@@ -27,9 +27,12 @@ public class VehicleService {
     @Transactional
     public void saveVehicle() {
         this.vehicMapper.save();
+        this.vehicMapper.save();
+        this.vehicleModelMapper.save();
+        this.vehicleModelMapper.save();
         this.vehicleModelMapper.save();
 
-        throw new NullPointerException();
+        // throw new NullPointerException();
     }
 
     @Transactional

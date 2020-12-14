@@ -11,24 +11,25 @@
             http://www.springframework.org/schema/tx/spring-tx.xsd">
 
 <!--    <context:component-scan base-package="org.indunet.nifi.*" />-->
+<!--    <context:component-scan base-package="org.indunet.nifi.*" />-->
 
-    <bean id="dataSource" class="com.alibaba.druid.pool.DruidDataSource">
-        <property name="driverClassName" value="org.postgresql.Driver" />
-        <property name="url" value="jdbc:postgresql://dell-node-06:5432/chance-om" />
-        <property name="username" value="postgres" />
-        <property name="password" value="123456" />
-<!--        <property name="defaultAutoCommit" value="true" />-->
-    </bean>
+<!--    <bean id="dataSource" class="com.alibaba.druid.pool.DruidDataSource">-->
+<!--        <property name="driverClassName" value="org.postgresql.Driver" />-->
+<!--        <property name="url" value="jdbc:postgresql://dell-node-06:5432/chance-om" />-->
+<!--        <property name="username" value="postgres" />-->
+<!--        <property name="password" value="123456" />-->
+<!--&lt;!&ndash;        <property name="defaultAutoCommit" value="true" />&ndash;&gt;-->
+<!--    </bean>-->
 
 <!--    <bean id="sqlSessionFactory" class="org.mybatis.spring.SqlSessionFactoryBean">-->
 <!--        <property name="dataSource" ref="dataSource" />-->
 <!--        <property name="mapperLocations" value="classpath*:org/indunet/nifi/mapper/*.xml" />-->
 <!--    </bean>-->
 
-    <bean id="mapperScannerConfigurer" class="org.mybatis.spring.mapper.MapperScannerConfigurer">
-        <property name="sqlSessionFactoryBeanName" value="sqlSessionFactory" />
-        <property name="basePackage" value="org.indunet.nifi.mapper"/>
-    </bean>
+<!--    <bean id="mapperScannerConfigurer" class="org.mybatis.spring.mapper.MapperScannerConfigurer">-->
+<!--        <property name="sqlSessionFactoryBeanName" value="sqlSessionFactory" />-->
+<!--        <property name="basePackage" value="org.indunet.nifi.mapper"/>-->
+<!--    </bean>-->
 
 <!--    <bean id="transactionManager"-->
 <!--          class="org.springframework.jdbc.datasource.DataSourceTransactionManager">-->

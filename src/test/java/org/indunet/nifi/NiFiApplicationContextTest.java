@@ -69,35 +69,32 @@ public class NiFiApplicationContextTest {
 //            beanDefinitionBuilder.addConstructorArgValue(arg);
 //        }
 
-        // beanDefinitionBuilder.addAutowiredProperty("employee");
-        // beanDefinitionBuilder.addPropertyReference("employee", "employee");
+         beanDefinitionBuilder.addAutowiredProperty("employee");
+         beanDefinitionBuilder.addPropertyReference("employee", "employee");
         beanDefinitionBuilder.setAutowireMode(AutowireCapableBeanFactory.AUTOWIRE_BY_TYPE);
 
         BeanDefinition beanDefinition = beanDefinitionBuilder.getRawBeanDefinition();
         BeanDefinitionRegistry beanFactory = (BeanDefinitionRegistry) context.applicationContext.getBeanFactory();
 
-        Man aMan = new Man("Brother Chun");
-        // Supplier<Man> supplier = () -> new Man("123");
+//         Man aMan = new Man("Brother Chun");
+//         Supplier<Man> supplier = () -> new Man("123");
 
-        beanFactory.registerBeanDefinition("man", BeanDefinitionBuilder.genericBeanDefinition(Man.class, () -> aMan).getRawBeanDefinition());
+        // beanFactory.registerBeanDefinition("man", BeanDefinitionBuilder.genericBeanDefinition(Man.class, () -> aMan).getRawBeanDefinition());
         beanFactory.registerBeanDefinition("employee", BeanDefinitionBuilder.genericBeanDefinition(Employee.class).getRawBeanDefinition());
         beanFactory.registerBeanDefinition("manager", beanDefinition);
 
-//        Manager manager = context.applicationContext.getBean("manager", Manager.class);
-//        Man man = context.applicationContext.getBean("man", Man.class);
-//        man.print();
-//        manager.print();
+
 //        System.out.println("Init spring context");
 
-//        DruidDataSource dataSource = new DruidDataSource();
-//
-//        dataSource.setDriverClassName("org.postgresql.Driver");
-//        dataSource.setUrl("jdbc:postgresql://dell-node-06:5432/chance-om");
-//        dataSource.setUsername("postgres");
-//        dataSource.setPassword("123456");
-//
-//        beanFactory.registerBeanDefinition("dataSource",
-//                BeanDefinitionBuilder.genericBeanDefinition(DataSource.class, () -> dataSource).getRawBeanDefinition());
+        DruidDataSource dataSource = new DruidDataSource();
+
+        dataSource.setDriverClassName("org.postgresql.Driver");
+        dataSource.setUrl("jdbc:postgresql://dell-node-06:5432/chance-om");
+        dataSource.setUsername("postgres");
+        dataSource.setPassword("123456");
+
+        beanFactory.registerBeanDefinition("dataSource",
+                BeanDefinitionBuilder.genericBeanDefinition(DataSource.class, () -> dataSource).getRawBeanDefinition());
 
         // TransactionFactory factory = new JdbcTransactionFactory();
 
@@ -110,13 +107,22 @@ public class NiFiApplicationContextTest {
         // beanFactory.registerBeanDefinition("configuration", BeanDefinitionBuilder.genericBeanDefinition(Configuration.class, () -> configuration).getRawBeanDefinition());
         // SqlSessionFactoryBean factoryBean = new SqlSessionFactoryBean();
 
+//        MapperScannerConfigurer mapper = new MapperScannerConfigurer();
+//        mapper.set
+
         BeanDefinitionBuilder sqlSessionFactory = BeanDefinitionBuilder.genericBeanDefinition(SqlSessionFactoryBean.class);
         sqlSessionFactory.addPropertyReference("dataSource", "dataSource");
-        sqlSessionFactory.addPropertyValue("configuration", configuration);
-        sqlSessionFactory.addPropertyValue("mapperLocations", "classpath*:org/indunet/nifi/mapper/*.xml");
+        // sqlSessionFactory.addPropertyValue("configuration", configuration);
+        // sqlSessionFactory.addPropertyValue("mapperLocations", "classpath*:org/indunet/nifi/mapper/*.xml");
 
          beanFactory.registerBeanDefinition("sqlSessionFactory", sqlSessionFactory.getBeanDefinition());
         // factoryBean.set
+
+        MapperScannerConfigurer scanner = new MapperScannerConfigurer();
+        scanner.setBasePackage("org.indunet.nifi.mapper");
+        scanner.setSqlSessionFactoryBeanName("sqlSessionFactory");
+        beanFactory.registerBeanDefinition("scanner",
+                BeanDefinitionBuilder.genericBeanDefinition(MapperScannerConfigurer.class, () -> scanner).getRawBeanDefinition());
 
         // DataSourceTransactionManager
 
@@ -128,11 +134,7 @@ public class NiFiApplicationContextTest {
 //        BeanDefinitionBuilder jtaTransactionManager = BeanDefinitionBuilder.genericBeanDefinition(JtaTransactionManagerFactoryBean.class);
 //        beanFactory.registerBeanDefinition("jtaTransactionManager", jtaTransactionManager.getBeanDefinition());
 
-//        MapperScannerConfigurer scanner = new MapperScannerConfigurer();
-//        scanner.setBasePackage("org.indunet.mapper");
-//        scanner.setSqlSessionFactoryBeanName("sqlSessionFactory");
-//        beanFactory.registerBeanDefinition("scanner",
-//                BeanDefinitionBuilder.genericBeanDefinition(MapperScannerConfigurer.class, () -> scanner).getRawBeanDefinition());
+
 //        SqlSessionTemplate template = new SqlSessionTemplate(factoryBean.getObject());
 //        beanFactory.registerBeanDefinition("sqlSessionTemplate", BeanDefinitionBuilder.genericBeanDefinition(SqlSessionTemplate.class, () -> template).getRawBeanDefinition());
 
@@ -146,7 +148,12 @@ public class NiFiApplicationContextTest {
 //        vehicleModelMapper.addPropertyReference("sqlSessionFactory", "sqlSessionFactory");
 //        beanFactory.registerBeanDefinition("vehicleModelMapper", vehicleModelMapper.getBeanDefinition());
 
-         beanFactory.registerBeanDefinition("vehicleService", BeanDefinitionBuilder.genericBeanDefinition(VehicleService.class).getRawBeanDefinition());
+        VehicleService vehicleService = new VehicleService();
+        BeanDefinitionBuilder vehicleServiceBuilder = BeanDefinitionBuilder.genericBeanDefinition(VehicleService.class, () -> vehicleService);
+        vehicleServiceBuilder.setAutowireMode(2);
+
+        // beanFactory.registerBeanDefinition("vehicleService", BeanDefinitionBuilder.genericBeanDefinition(VehicleService.class).getRawBeanDefinition());
+        beanFactory.registerBeanDefinition("vehicleService", vehicleServiceBuilder.getRawBeanDefinition());
 
         context.applicationContext.refresh();
 
@@ -163,11 +170,15 @@ public class NiFiApplicationContextTest {
         System.out.println(context.applicationContext.getBean(VehicleMapper.class).listVehicle().size());
         System.out.println(context.applicationContext.getBean(VehicleService.class).count());
 
-        VehicleService vehicleService = context.applicationContext.getBean(VehicleService.class);
+        // VehicleService vehicleService = context.applicationContext.getBean(VehicleService.class);
+        VehicleService vehicleService2 = context.applicationContext.getBean(VehicleService.class);
+
+        Manager manager = context.applicationContext.getBean("manager", Manager.class);
+        manager.print();
 
         IntStream.range(0, 10)
                 .parallel().forEach(i -> {
-            vehicleService.saveVehicle();
+            vehicleService2.saveVehicle();
             // vehicleService.saveVehicleModel();
         });
     }
