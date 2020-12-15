@@ -7,10 +7,18 @@ import java.io.PrintWriter;
 import java.sql.Connection;
 import java.util.logging.Logger;
 
-public class DbcpServiceAdapter implements DataSource {
+/**
+ * DBCPService adapter that adapt to DataSource interface.
+ */
+public class DBCPServiceAdapter implements DataSource {
     protected DBCPService dbcpService;
 
-    public DbcpServiceAdapter(DBCPService dbcpService) {
+    /**
+     * Instantiates a new DBCPServiceAdapter.
+     *
+     * @param dbcpService DBCPService
+     */
+    public DBCPServiceAdapter(DBCPService dbcpService) {
         this.dbcpService = dbcpService;
     }
 

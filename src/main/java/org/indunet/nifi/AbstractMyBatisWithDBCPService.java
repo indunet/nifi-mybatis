@@ -37,12 +37,14 @@ import java.util.List;
 import java.util.function.Supplier;
 
 /**
- * @author Deng Ran
- * @version 1.0
+ * This is a abstract class, developers can realize user-defined controller service through inheritance it.
+ * Compared to AbstractMyBatisService, AbstractMyBatisWithDBCPService has a built-in connection pool, developers don't need to pass in DBCPService as a property.
+ *
+ * @see AbstractMyBatisService
  */
 @Tags({"nifi", "mybatis", "database", "autowire", "connection pool"})
 @CapabilityDescription("Provides database access through mybatis, processors use it as controller services.")
-public abstract class AbstractMyBatisWithPoolService extends AbstractControllerService {
+public abstract class AbstractMyBatisWithDBCPService extends AbstractControllerService {
     protected ComponentLog log;
     protected GenericApplicationContext applicationContext;
     protected BeanDefinitionRegistry registry;
@@ -140,22 +142,40 @@ public abstract class AbstractMyBatisWithPoolService extends AbstractControllerS
         this.initialize(new Configuration());
     }
 
+    /**
+     * This is a configuration class that helps users to initialize controller service through chain expression.
+     */
     public class Configuration {
         Object controllerService;
         String basePackage;
 
+        /**
+         * Sets controller service.
+         *
+         * @param controllerService usually pass in this
+         * @return this
+         */
         public Configuration setControllerService(Object controllerService) {
             this.controllerService = controllerService;
 
             return this;
         }
 
+        /**
+         * Sets base package of mybatis which including xml files.
+         *
+         * @param basePackage the base package
+         * @return this
+         */
         public Configuration setBasePackage(String basePackage) {
             this.basePackage = basePackage;
 
             return this;
         }
 
+        /**
+         * After the parameters above are configured, call this method to complete the initialization of controller service.
+         */
         public void build() {
             // MapperScannerConfigurer
             BeanDefinitionBuilder scannerConfigurerBuilder =
@@ -167,7 +187,7 @@ public abstract class AbstractMyBatisWithPoolService extends AbstractControllerS
             // Spring services
             Arrays.stream(this.controllerService.getClass().getDeclaredFields())
                     .filter(f -> f.isAnnotationPresent(Autowired.class))
-                    .filter(f -> f.getType().isInterface() == false)
+                    .filter(f -> !f.getType().isInterface())
                     .filter(f -> f.getType().isAnnotationPresent(Service.class))
                     .forEach(f -> {
                         BeanDefinitionBuilder serviceBuilder =
@@ -190,6 +210,11 @@ public abstract class AbstractMyBatisWithPoolService extends AbstractControllerS
         }
     }
 
+    /**
+     * Developers need to rewrite the abstract method to complete the initialization.
+     *
+     * @param configuration Configure parameters and initialize through it.
+     */
     protected abstract void initialize(Configuration configuration);
 
     @OnDisabled

@@ -1,7 +1,6 @@
 package org.indunet.nifi;
 
 import org.apache.nifi.components.PropertyDescriptor;
-import org.apache.nifi.dbcp.DBCPConnectionPool;
 import org.apache.nifi.processor.AbstractProcessor;
 import org.apache.nifi.processor.ProcessContext;
 import org.apache.nifi.processor.ProcessSession;
@@ -9,10 +8,8 @@ import org.apache.nifi.processor.exception.ProcessException;
 import org.apache.nifi.reporting.InitializationException;
 import org.apache.nifi.util.TestRunner;
 import org.apache.nifi.util.TestRunners;
-import org.indunet.nifi.controller.VehicleControllerService;
 import org.indunet.nifi.controller.VehicleService;
-import org.indunet.nifi.controller.VehicleWithPoolControllerService;
-import org.indunet.nifi.mapper.VehicleMapper;
+import org.indunet.nifi.controller.VehicleWithDBCPControllerService;
 import org.junit.Test;
 
 import java.util.ArrayList;
@@ -20,7 +17,7 @@ import java.util.List;
 
 import static org.junit.Assert.assertTrue;
 
-public class VehicleWithPoolControllerServiceTest {
+public class VehicleWithDBCPControllerServiceTest {
     protected final static String DATABASE_URL = "jdbc:postgresql://dell-node-06:5432/nifi-mybatis";
     protected final static String DB_USER = "postgres";
     protected final static String DB_PASSWORD = "123456";
@@ -49,14 +46,14 @@ public class VehicleWithPoolControllerServiceTest {
     public void testOnConfigured() throws InitializationException {
         TestRunner runner = TestRunners.newTestRunner(new TestProcessor());
 
-        VehicleWithPoolControllerService vehicleWithPoolService = new VehicleWithPoolControllerService();
+        VehicleWithDBCPControllerService vehicleWithPoolService = new VehicleWithDBCPControllerService();
 
         runner.addControllerService("vehicleService", vehicleWithPoolService);
 
-        runner.setProperty(vehicleWithPoolService, VehicleWithPoolControllerService.DATABASE_URL, DATABASE_URL);
-        runner.setProperty(vehicleWithPoolService, VehicleWithPoolControllerService.DB_USER, DB_USER);
-        runner.setProperty(vehicleWithPoolService, VehicleWithPoolControllerService.DB_PASSWORD, DB_PASSWORD);
-        runner.setProperty(vehicleWithPoolService, VehicleWithPoolControllerService.DB_DRIVERNAME, DB_DRIVERNAME);
+        runner.setProperty(vehicleWithPoolService, VehicleWithDBCPControllerService.DATABASE_URL, DATABASE_URL);
+        runner.setProperty(vehicleWithPoolService, VehicleWithDBCPControllerService.DB_USER, DB_USER);
+        runner.setProperty(vehicleWithPoolService, VehicleWithDBCPControllerService.DB_PASSWORD, DB_PASSWORD);
+        runner.setProperty(vehicleWithPoolService, VehicleWithDBCPControllerService.DB_DRIVERNAME, DB_DRIVERNAME);
 
         runner.enableControllerService(vehicleWithPoolService);
 

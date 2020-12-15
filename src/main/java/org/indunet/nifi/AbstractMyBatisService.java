@@ -1,14 +1,5 @@
 package org.indunet.nifi;
 
-import java.lang.reflect.InvocationTargetException;
-import org.apache.ibatis.binding.BindingException;
-import org.apache.ibatis.mapping.Environment;
-import org.apache.ibatis.session.Configuration;
-import org.apache.ibatis.session.SqlSession;
-import org.apache.ibatis.session.SqlSessionFactory;
-import org.apache.ibatis.session.SqlSessionFactoryBuilder;
-import org.apache.ibatis.transaction.TransactionFactory;
-import org.apache.ibatis.transaction.jdbc.JdbcTransactionFactory;
 import org.apache.nifi.annotation.documentation.CapabilityDescription;
 import org.apache.nifi.annotation.documentation.Tags;
 import org.apache.nifi.annotation.lifecycle.OnDisabled;
@@ -19,20 +10,34 @@ import org.apache.nifi.controller.ConfigurationContext;
 import org.apache.nifi.controller.ControllerServiceInitializationContext;
 import org.apache.nifi.dbcp.DBCPService;
 import org.apache.nifi.logging.ComponentLog;
-import org.apache.nifi.reporting.InitializationException;
+import org.mybatis.spring.SqlSessionFactoryBean;
+import org.mybatis.spring.mapper.MapperScannerConfigurer;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.config.AutowireCapableBeanFactory;
+import org.springframework.beans.factory.support.BeanDefinitionBuilder;
+import org.springframework.beans.factory.support.BeanDefinitionRegistry;
+import org.springframework.beans.factory.xml.XmlBeanDefinitionReader;
+import org.springframework.context.support.GenericApplicationContext;
+import org.springframework.jdbc.datasource.DataSourceTransactionManager;
+import org.springframework.stereotype.Service;
 
-import javax.sql.DataSource;
-import java.lang.reflect.Field;
-import java.lang.reflect.Proxy;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
+import java.util.function.Supplier;
 
-@Tags({"nifi", "mybatis", "database", "autowire"})
+/**
+ * This is a abstract class, developers can realize user-defined controller service through inheritance it.
+ * Compared to AbstractMyBatisWithDBCPService, AbstractMyBatisService don't have a built-in connection pool, developers need to pass in DBCPService as a property.
+ *
+ * @see AbstractMyBatisWithDBCPService
+ */
+@Tags({"nifi", "database", "mybatis", "spring"})
 @CapabilityDescription("Provides database access through mybatis, processors use it as controller services.")
 public abstract class AbstractMyBatisService extends AbstractControllerService {
     protected ComponentLog log;
-    private Configuration configuration;
+    protected GenericApplicationContext applicationContext;
+    protected BeanDefinitionRegistry registry;
 
     public static final PropertyDescriptor DBCP_SERVICE = new PropertyDescriptor.Builder()
             .name("Database Connection Pooling Service")
@@ -53,88 +58,109 @@ public abstract class AbstractMyBatisService extends AbstractControllerService {
 
     @OnEnabled
     public void onConfigured(final ConfigurationContext context) {
+        this.applicationContext = new GenericApplicationContext();
+
+        new XmlBeanDefinitionReader(applicationContext).loadBeanDefinitions("nifi-spring.xml");
+        this.registry = (BeanDefinitionRegistry) this.applicationContext.getBeanFactory();
+
+        // DataSource
         DBCPService dbcpService = context.getProperty(DBCP_SERVICE).asControllerService(DBCPService.class);
+        DBCPServiceAdapter dbcpServiceAdapter = new DBCPServiceAdapter(dbcpService);
 
-        TransactionFactory factory = new JdbcTransactionFactory();
-        DataSource dataSource = new DbcpServiceAdapter(dbcpService);
-        // Field field = null;
+        BeanDefinitionBuilder dataSourceBuilder =
+                BeanDefinitionBuilder.genericBeanDefinition(DBCPServiceAdapter.class, () -> dbcpServiceAdapter);
+        registry.registerBeanDefinition("dataSource", dataSourceBuilder.getRawBeanDefinition());
 
-//        try {
-//            field = dbcpService.getClass().getDeclaredField("dataSource");
-//            field.setAccessible(true);
-//
-//            dataSource = (DataSource) field.get(dbcpService);
-//        } catch (NoSuchFieldException | IllegalAccessException e) {
-//            this.log.info("Fail getting data source from dbcp service.");
-//            this.log.info(e.getMessage());
-//
-//            dataSource = new DbcpServiceAdapter(dbcpService);
-//        }
+        // SqlSessionFactory
+        BeanDefinitionBuilder sqlSessionFactory = BeanDefinitionBuilder.genericBeanDefinition(SqlSessionFactoryBean.class);
+        sqlSessionFactory.addPropertyReference("dataSource", "dataSource");
+        registry.registerBeanDefinition("sqlSessionFactory", sqlSessionFactory.getRawBeanDefinition());
 
-        Environment environment = new Environment("nifi-mybatis", factory, dataSource);
-        configuration = new Configuration(environment);
-        this.initialize(configuration);
+        // DataSourceTransactionManager
+        BeanDefinitionBuilder transactionManager = BeanDefinitionBuilder.genericBeanDefinition(DataSourceTransactionManager.class);
+        transactionManager.addConstructorArgReference("dataSource");
+        registry.registerBeanDefinition("transactionManager", transactionManager.getBeanDefinition());
+
+        this.initialize(new Configuration());
     }
 
-    protected void autowire(Object object) {
-        SqlSessionFactory sqlSessionFactory = new SqlSessionFactoryBuilder().build(configuration);
-        Field[] fields = object.getClass().getDeclaredFields();
+    /**
+     * This is a configuration class that helps users to initialize controller service through chain expression.
+     */
+    public class Configuration {
+        Object controllerService;
+        String basePackage;
 
-        // Check before autowire.
-        Arrays.stream(fields)
-                .forEach(field -> {
-                        try (SqlSession session = sqlSessionFactory.openSession()) {
-                            // Throw org.apache.ibatis.binding.BindingException when there is no class found.
-                            session.getMapper(field.getType());
-                        } catch (BindingException e) {
-                            e.printStackTrace();
-                            this.log.error(e.getMessage());
-                            this.log.error(field.getType().getName() + " is not known to the MapperRegistry.");
-                        }
+        /**
+         * Sets controller service.
+         *
+         * @param controllerService usually pass in this
+         * @return this
+         */
+        public Configuration setControllerService(Object controllerService) {
+            this.controllerService = controllerService;
 
-                });
+            return this;
+        }
 
-        Arrays.stream(fields)
-                .filter(field -> field.isAnnotationPresent(Autowired.class))
-                .filter(field -> field.getType().isInterface())
-                .peek(field -> field.setAccessible(true))
-                .forEach(field -> {
-                    Object mapperProxy = Proxy.newProxyInstance(
-                            sqlSessionFactory.getClass().getClassLoader(),
-                            new Class[]{field.getType()},
-                            (proxy, method, args) -> {
-                                try(SqlSession session = sqlSessionFactory.openSession()) {
-                                    // Throw org.apache.ibatis.binding.BindingException when there is no class found.
-                                    Object mapper = session.getMapper(field.getType());
-                                    Object value = method.invoke(mapper, args);
+        /**
+         * Sets base package of mybatis which including xml files.
+         *
+         * @param basePackage the base package
+         * @return this
+         */
+        public Configuration setBasePackage(String basePackage) {
+            this.basePackage = basePackage;
 
-                                    session.commit();
-                                    session.close();
+            return this;
+        }
 
-                                    return value;
-                                } catch (IllegalAccessException | IllegalArgumentException
-                                            | InvocationTargetException | BindingException e) {
-                                    this.log.error(e.getMessage());
-                                    e.printStackTrace();
+        /**
+         * After the parameters above are configured, call this method to complete the initialization of controller service.
+         */
+        public void build() {
+            // MapperScannerConfigurer
+            BeanDefinitionBuilder scannerConfigurerBuilder =
+                    BeanDefinitionBuilder.genericBeanDefinition(MapperScannerConfigurer.class);
+            scannerConfigurerBuilder.addPropertyValue("basePackage", this.basePackage);
+            scannerConfigurerBuilder.addPropertyValue("sqlSessionFactoryBeanName", "sqlSessionFactory");
+            registry.registerBeanDefinition("mapperScannerConfigurer", scannerConfigurerBuilder.getRawBeanDefinition());
 
-                                    throw new InitializationException(e);
-                                }
-                            }
-                    );
+            // Spring services
+            Arrays.stream(this.controllerService.getClass().getDeclaredFields())
+                    .filter(f -> f.isAnnotationPresent(Autowired.class))
+                    .filter(f -> !f.getType().isInterface())
+                    .filter(f -> f.getType().isAnnotationPresent(Service.class))
+                    .forEach(f -> {
+                        BeanDefinitionBuilder serviceBuilder =
+                                BeanDefinitionBuilder.genericBeanDefinition(f.getType());
+                        serviceBuilder.setAutowireMode(AutowireCapableBeanFactory.AUTOWIRE_BY_TYPE);
+                        registry.registerBeanDefinition(f.getType().getSimpleName(),
+                                serviceBuilder.getRawBeanDefinition());
+                    });
 
-                    try {
-                        field.set(object, mapperProxy);
-                    } catch (IllegalAccessException e) {
-                        e.printStackTrace();
-                        this.log.error(e.getMessage());
-                    }
-                });
+            // ControllerService
+            Supplier supplier = () -> controllerService;
+
+            BeanDefinitionBuilder controllerServiceBuilder =
+                    BeanDefinitionBuilder.genericBeanDefinition(controllerService.getClass(), supplier);
+            controllerServiceBuilder.setAutowireMode(AutowireCapableBeanFactory.AUTOWIRE_BY_TYPE);
+            registry.registerBeanDefinition(controllerService.getClass().getSimpleName(),
+                    controllerServiceBuilder.getRawBeanDefinition());
+
+            applicationContext.refresh();
+        }
     }
 
+    /**
+     * Developers need to rewrite the abstract method to complete the initialization.
+     *
+     * @param configuration Configure parameters and initialize through it.
+     */
     protected abstract void initialize(Configuration configuration);
 
     @OnDisabled
     public void shutdown() {
-
+        this.applicationContext.close();
     }
 }

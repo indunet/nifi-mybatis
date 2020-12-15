@@ -1,8 +1,6 @@
 package org.indunet.nifi.controller;
 
-import org.apache.ibatis.jdbc.Null;
-import org.indunet.nifi.AbstractMyBatisService;
-import org.indunet.nifi.AbstractMyBatisWithPoolService;
+import org.indunet.nifi.AbstractMyBatisWithDBCPService;
 import org.indunet.nifi.entity.VehicleDO;
 import org.indunet.nifi.entity.VehicleModelDO;
 import org.indunet.nifi.mapper.VehicleMapper;
@@ -12,14 +10,10 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 
-/**
- * @author
- * @version 1.0
- */
-public class VehicleWithPoolControllerService extends AbstractMyBatisWithPoolService implements VehicleService {
-    @Autowired(required = true)
+public class VehicleWithDBCPControllerService extends AbstractMyBatisWithDBCPService implements VehicleService {
+    @Autowired
     VehicleMapper vehicleMapper;
-    @Autowired(required = true)
+    @Autowired
     VehicleModelMapper vehicleModelMapper;
     @Autowired
     org.indunet.nifi.service.VehicleService vehicleService;
